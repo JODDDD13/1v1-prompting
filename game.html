@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAINT OFF // 1v1 AI Art Battle</title>
+  <link rel="stylesheet" href="game.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <div class="viewport">
+    <header>
+      <div class="brand">
+        <span class="logo-tag">PAINT OFF</span>
+        <span>1v1 ART BATTLE</span>
+      </div>
+      <div class="nav-links">
+        <span class="active" id="nav-lobby">// LOBBY</span>
+        <span id="nav-topic">// TOPIC</span>
+        <span id="nav-arena">// ARENA</span>
+      </div>
+      <div class="status-badge">
+        <div class="dot"></div>
+        <span id="ping">14MS / CONNECTED</span>
+      </div>
+    </header>
+
+    <!-- SCREEN 1: LOBBY -->
+    <section id="screen-lobby" class="screen active">
+      <div class="lobby-header">
+        <h1>ENTER THE ARENA.</h1>
+        <p>ONE PROMPT. ONE SHOT. ONE WINNER.</p>
+      </div>
+
+      <div class="lobby-grid">
+        <div class="panel">
+          <div class="panel-title">
+            <span>// SLOT_01</span>
+            <span>INSTANT DISPATCH</span>
+          </div>
+          <div class="input-group">
+            <label>YOUR NAME</label>
+            <input type="text" id="username" value="@neon_cipher">
+          </div>
+          <button class="btn" id="btn-host">⚡ HOST A ROOM</button>
+          <div id="room-display" style="margin-top: 15px; font-size: 11px; display: none; background: rgba(0,255,102,0.1); padding: 10px; border: 1px dashed var(--neon-green); text-align: center;">
+            LOBBY TOKEN: <strong id="generated-code" style="color: var(--neon-green); font-size: 14px;">---</strong>
+            <div style="font-size: 9px; color: var(--text-muted); margin-top: 4px;">SHARE THIS CODE WITH YOUR OPPONENT</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <span>// SLOT_02</span>
+            <span>MANUAL ROUTE</span>
+          </div>
+          <div class="input-group">
+            <label>TARGET CODE</label>
+            <input type="text" id="room-code" placeholder="E.G. PK-8921">
+          </div>
+          <button class="btn btn-secondary" id="btn-join">➔ JOIN ROOM</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: TOPIC SELECTION -->
+    <section id="screen-topic" class="screen">
+      <div class="match-meta">
+        <div>HOST: <span id="host-name" style="color: var(--neon-green)">@neon_cipher</span> [READY]</div>
+        <div>LOBBY: <span id="topic-room-code" style="color: var(--neon-green)">PK-XXXX</span></div>
+        <div>OPPONENT: <span id="opp-name" style="color: var(--text-muted)">WAITING FOR PLAYER 2...</span></div>
+      </div>
+
+      <div style="font-size: 14px; font-weight: bold; margin-bottom: 15px;">CHOOSE YOUR BATTLE TOPIC.</div>
+
+      <div class="topic-grid">
+        <div class="topic-card selected" onclick="selectTopic(this, 'A CITY OF THE FUTURE')">
+          <span class="tag-selected">YOUR CHOICE</span>
+          <div class="topic-number">01</div>
+          <div class="topic-title">A CITY OF THE FUTURE.</div>
+          <div class="topic-desc">High-density cybernetic megastructures, vertical transit networks, and bio-architectural towers.</div>
+        </div>
+
+        <div class="topic-card" onclick="selectTopic(this, 'A MAGICAL FOREST')">
+          <span class="tag-selected">YOUR CHOICE</span>
+          <div class="topic-number">02</div>
+          <div class="topic-title">A MAGICAL FOREST.</div>
+          <div class="topic-desc">Bioluminescent ancient flora, ethereal wildlife, and enchanted twilight waterfalls.</div>
+        </div>
+
+        <div class="topic-card" onclick="selectTopic(this, 'AN UNDERWATER KINGDOM')">
+          <span class="tag-selected">YOUR CHOICE</span>
+          <div class="topic-number">03</div>
+          <div class="topic-title">AN UNDERWATER KINGDOM.</div>
+          <div class="topic-desc">Abyssal pressure domes, luminescent coral spires, and submerged crystalline architecture.</div>
+        </div>
+
+        <div class="topic-card" onclick="selectTopic(this, 'A WORLD BEYOND SPACE')">
+          <span class="tag-selected">YOUR CHOICE</span>
+          <div class="topic-number">04</div>
+          <div class="topic-title">A WORLD BEYOND SPACE.</div>
+          <div class="topic-desc">Non-euclidean geometry, cosmic anomalies, nebular oceans, and dimensional rifts.</div>
+        </div>
+      </div>
+
+      <button class="btn" id="btn-confirm-topic">ENTERING CANVAS... ➔</button>
+    </section>
+
+    <!-- SCREEN 3: ARENA -->
+    <section id="screen-arena" class="screen">
+      <div class="arena-banner">
+        <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 5px;">// YOUR CHALLENGE</div>
+        <h2 id="chosen-topic-title">"A CITY THAT EXISTS ABOVE THE CLOUDS."</h2>
+      </div>
+
+      <div class="prompt-area">
+        <div class="arena-status">
+          <span>>> PROMPT_BUFFER_V1.RAW</span>
+          <span id="char-count">0 / 150 WORDS</span>
+        </div>
+
+        <textarea id="prompt-input" placeholder="Describe the masterpiece you want AI to create. Strictly one prompt iteration..."></textarea>
+
+        <div style="margin-bottom: 15px;">
+          <div class="arena-status" style="margin-bottom: 2px;">
+            <span>OPPONENT STATUS</span>
+            <span id="opponent-status">WRITING...</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="opponent-progress"></div>
+          </div>
+        </div>
+
+        <button class="btn" id="btn-lock">🔒 LOCK MY FINAL PROMPT</button>
+      </div>
+    </section>
+
+            <!-- SCREEN 4: RESULTS -->
+    <section id="screen-results" class="screen">
+      <div class="arena-banner">
+        <h2>BATTLE RESULTS</h2>
+      </div>
+      
+      <div class="results-grid">
+        <!-- Player 1 -->
+        <div class="result-card">
+          <h3 id="res-p1-name">Player 1</h3>
+          <img id="res-p1-img" class="result-image" alt="Player 1 Art" />
+        </div>
+
+        <!-- Player 2 -->
+        <div class="result-card">
+          <h3 id="res-p2-name">Player 2</h3>
+          <img id="res-p2-img" class="result-image" alt="Player 2 Art" />
+        </div>
+      </div>
+
+      <div style="text-align: center;">
+        <button class="btn" style="max-width: 300px; margin: 0 auto;" onclick="location.reload()">PLAY AGAIN</button>
+      </div>
+    </section>
+
+    <footer>
+      <span>PAINT OFF // ONE PROMPT. ONE SHOT. ONE WINNER.</span>
+      <span>SYS.STATUS: READY | REGION: US-EAST-1 | V2.4.0</span>
+    </footer>
+  </div>
+
+  <script>
+        const socket = typeof io !== 'undefined' ? io() : null;
+    let currentRoomCode = '';
+    let selectedTopicText = "A CITY OF THE FUTURE";
+    let isHost = false; // Tracks if the current player is the host
+
+    const screens = {
+      lobby: document.getElementById('screen-lobby'),
+      topic: document.getElementById('screen-topic'),
+      arena: document.getElementById('screen-arena'),
+      results: document.getElementById('screen-results') // New Screen
+    };
+
+    const navs = {
+      lobby: document.getElementById('nav-lobby'),
+      topic: document.getElementById('nav-topic'),
+      arena: document.getElementById('nav-arena')
+    };
+
+    function showScreen(target) {
+      // Hide all screens
+      Object.keys(screens).forEach(key => {
+        if (screens[key]) screens[key].classList.remove('active');
+      });
+      // Remove active from all navs
+      Object.keys(navs).forEach(key => {
+        if (navs[key]) navs[key].classList.remove('active');
+      });
+      
+      // Show target screen and highlight nav
+      if (screens[target]) screens[target].classList.add('active');
+      if (navs[target]) navs[target].classList.add('active');
+    }
+
+    // --- LOBBY BUTTONS ---
+    document.getElementById('btn-host').addEventListener('click', () => {
+      const username = document.getElementById('username').value || '@neon_cipher';
+      if (socket) {
+        socket.emit('host_room', { username });
+      } else {
+        showScreen('topic');
+      }
+    });
+
+    document.getElementById('btn-join').addEventListener('click', () => {
+      const username = document.getElementById('username').value || '@neon_cipher';
+      const code = document.getElementById('room-code').value.trim();
+      if (socket && code) {
+        socket.emit('join_room', { username, roomCode: code });
+      } else if (!code) {
+        alert("Please enter a room code!");
+      } else {
+        showScreen('topic');
+      }
+    });
+
+    // --- SOCKET EVENTS ---
+    if (socket) {
+      // 1. Room Created (You are the Host)
+      socket.on('room_created', ({ roomCode, player }) => {
+        currentRoomCode = roomCode;
+        isHost = true; 
+        
+        document.getElementById('generated-code').innerText = roomCode;
+        document.getElementById('room-display').style.display = 'block';
+        document.getElementById('host-name').innerText = player.username;
+        document.getElementById('topic-room-code').innerText = roomCode;
+        document.getElementById('opp-name').innerText = 'WAITING FOR PLAYER 2...';
+        document.getElementById('opp-name').style.color = 'var(--text-muted)';
+        
+        setTimeout(() => showScreen('topic'), 800);
+      });
+
+      // 2. Opponent Joined (Match Ready)
+      socket.on('match_ready', ({ roomCode, players }) => {
+        currentRoomCode = roomCode;
+        document.getElementById('host-name').innerText = players[0].username;
+        document.getElementById('topic-room-code').innerText = roomCode;
+        
+        if (players[1]) {
+          document.getElementById('opp-name').innerText = players[1].username + " [READY]";
+          document.getElementById('opp-name').style.color = "var(--neon-green)";
+        } else {
+          document.getElementById('opp-name').innerText = "WAITING FOR PLAYER 2...";
+          document.getElementById('opp-name').style.color = "var(--text-muted)";
+        }
+
+        // If you are the opponent joining, lock the UI so you can't select a topic
+        if (!isHost) {
+            const topicGrid = document.querySelector('.topic-grid');
+            if(topicGrid) {
+                topicGrid.style.pointerEvents = 'none';
+                topicGrid.style.opacity = '0.5';
+            }
+            const confirmBtn = document.getElementById('btn-confirm-topic');
+            if(confirmBtn) {
+                confirmBtn.style.display = 'none';
+            }
+            // Optional: Add a message
+            const title = document.querySelector('.match-meta');
+            if(title) title.innerHTML += '<div style="color:var(--neon-green); text-align:center; width:100%; margin-top:10px;">WAITING FOR HOST TO CHOOSE TOPIC...</div>';
+        }
+
+        showScreen('topic');
+      });
+
+      // 3. Error Message
+      socket.on('error_msg', (msg) => {
+        alert(msg);
+      });
+
+      // 4. Topic Updated (Host chose a topic, sync to opponent)
+      socket.on('topic_updated', ({ topic }) => {
+        selectedTopicText = topic;
+        // Update the visual selection for the opponent
+        document.querySelectorAll('.topic-card').forEach(card => {
+          if(card.innerText.includes(topic)) card.classList.add('selected');
+          else card.classList.remove('selected');
+        });
+      });
+
+      // 5. Start Arena (Both go to typing screen)
+      socket.on('start_arena', ({ chosenTopic }) => {
+        document.getElementById('chosen-topic-title').innerText = `"${chosenTopic}"`;
+        showScreen('arena');
+      });
+
+      // 6. Opponent Typing
+      socket.on('opponent_typing', ({ wordCount }) => {
+        const fill = Math.min(100, wordCount * 2.5);
+        const progressBar = document.getElementById('opponent-progress');
+        if(progressBar) progressBar.style.width = `${fill}%`;
+      });
+
+      // 7. Opponent Locked In
+      socket.on('opponent_locked', () => {
+        document.getElementById('opponent-status').innerText = 'LOCKED & READY';
+        document.getElementById('opponent-progress').style.width = '100%';
+      });
+
+      // 8. Match Complete (Generating Images)
+      socket.on('match_complete', () => {
+        alert("Both duelists locked in! Synthesizing AI outputs... (Please wait)");
+        // Disable the lock button to prevent spamming while AI generates
+        const lockBtn = document.getElementById('btn-lock');
+        if(lockBtn) {
+            lockBtn.innerText = "GENERATING...";
+            lockBtn.disabled = true;
+        }
+      });
+
+      // 9. Match Results (Show images on the same screen!)
+      socket.on('match_results', ({ players, images }) => {
+        console.log("Results received!");
+        
+        // Populate the Results Screen
+        document.getElementById('res-p1-name').innerText = players[0].username;
+        document.getElementById('res-p2-name').innerText = players[1].username;
+        
+        document.getElementById('res-p1-img').src = images[0];
+        document.getElementById('res-p2-img').src = images[1];
+        
+        // Switch both players to the results screen
+        showScreen('results'); 
+      });
+    }
+
+    // --- TOPIC SELECTION LOGIC ---
+    function selectTopic(element, topicName) {
+      if (!isHost) return; // Opponent cannot select a topic
+      
+      document.querySelectorAll('.topic-card').forEach(card => card.classList.remove('selected'));
+      element.classList.add('selected');
+      selectedTopicText = topicName;
+      
+      if (socket && currentRoomCode) {
+        socket.emit('select_topic', { roomCode: currentRoomCode, topic: topicName });
+      }
+    }
+
+    // --- CONFIRM TOPIC (HOST ONLY) ---
+    document.getElementById('btn-confirm-topic').addEventListener('click', () => {
+      if (!isHost) return; // Extra safety
+      
+      if (socket && currentRoomCode) {
+        // Tell server to start the battle
+        socket.emit('start_battle', { roomCode: currentRoomCode });
+      } else {
+        // Local fallback
+        document.getElementById('chosen-topic-title').innerText = `"${selectedTopicText}"`;
+        showScreen('arena');
+      }
+    });
+
+    // --- TYPING AREA ---
+    const textarea = document.getElementById('prompt-input');
+    const charCount = document.getElementById('char-count');
+    const oppProgress = document.getElementById('opponent-progress');
+
+    if (textarea) {
+        textarea.addEventListener('input', () => {
+          const words = textarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+          charCount.innerText = `${words} / 150 WORDS`;
+          
+          if (socket && currentRoomCode) {
+            socket.emit('update_prompt', { roomCode: currentRoomCode, promptText: textarea.value });
+          } else if (oppProgress) {
+            oppProgress.style.width = `${Math.min(100, words * 2.5)}%`;
+          }
+        });
+    }
+
+    // --- LOCK PROMPT ---
+    const lockBtn = document.getElementById('btn-lock');
+    if (lockBtn) {
+        lockBtn.addEventListener('click', () => {
+          if (socket && currentRoomCode) {
+            socket.emit('lock_prompt', { roomCode: currentRoomCode, promptText: textarea.value });
+          }
+          alert("Prompt Locked! Waiting for opponent...");
+          lockBtn.innerText = "LOCKED";
+          lockBtn.disabled = true;
+        });
+    }
+
+  </script>
+</body>
+</html>

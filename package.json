@@ -1,0 +1,13 @@
+{
+  "name": "paint-off-1v1",
+  "version": "1.0.0",
+  "description": "PAINT OFF // 1v1 AI Art Battle - Real-time multiplayer prompt arena",
+  "main": "gameserver.js",
+  "scripts": {
+    "start": "node gameserver.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
